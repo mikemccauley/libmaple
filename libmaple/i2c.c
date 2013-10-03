@@ -349,7 +349,10 @@ void _i2c_irq_handler(i2c_dev *dev) {
      */
 
     /* Check to see if MSL master slave bit is set */
-    if ((sr2 & I2C_SR2_MSL) != I2C_SR2_MSL) { /* 0 = slave mode 1 = master */
+    // next line is wrong: fix needed else get crashes in master
+//    if ((sr2 & I2C_SR2_MSL) != I2C_SR2_MSL) { /* 0 = slave mode 1 = master */
+// this works as a fix:
+     if (dev->state != I2C_STATE_BUSY) { /* Master Xfer and no place else sets I2C_STATE_BUSY */
 
         /* Check for address match */
         if (sr1 & I2C_SR1_ADDR) {
