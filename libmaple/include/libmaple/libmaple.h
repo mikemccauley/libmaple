@@ -32,6 +32,9 @@
 #ifndef _LIBMAPLE_LIBMAPLE_H_
 #define _LIBMAPLE_LIBMAPLE_H_
 
+#define LIBMAPLE_VERSION_MAJOR 0
+#define LIBMAPLE_VERSION_MINOR 100
+
 #ifdef __cplusplus
 extern "C" {
 #endif
