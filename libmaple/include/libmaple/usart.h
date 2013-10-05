@@ -379,14 +379,23 @@ typedef struct usart_reg_map {
 #define USART_RX_BUF_SIZE               64
 #endif
 
+#ifndef USART_TX_BUF_SIZE
+#define USART_TX_BUF_SIZE               64
+#endif
+
 /** USART device type */
 typedef struct usart_dev {
     usart_reg_map *regs;             /**< Register map */
     ring_buffer *rb;                 /**< RX ring buffer */
+    ring_buffer *tx_rb;              /**< TX ring buffer */
     uint32 max_baud;                 /**< @brief Deprecated.
                                       * Maximum baud rate. */
     uint8 rx_buf[USART_RX_BUF_SIZE]; /**< @brief Deprecated.
                                       * Actual RX buffer used by rb.
+                                      * This field will be removed in
+                                      * a future release. */
+    uint8 tx_buf[USART_TX_BUF_SIZE]; /**< @brief Deprecated.
+                                      * Actual TX buffer used by tx_rb.
                                       * This field will be removed in
                                       * a future release. */
     rcc_clk_id clk_id;               /**< RCC clock information */

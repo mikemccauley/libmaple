@@ -41,9 +41,11 @@
  */
 
 static ring_buffer usart1_rb;
+static ring_buffer usart1_tx_rb;
 static usart_dev usart1 = {
     .regs     = USART1_BASE,
     .rb       = &usart1_rb,
+    .tx_rb    = &usart1_tx_rb,
     .max_baud = 4500000UL,
     .clk_id   = RCC_USART1,
     .irq_num  = NVIC_USART1,
@@ -52,9 +54,11 @@ static usart_dev usart1 = {
 usart_dev *USART1 = &usart1;
 
 static ring_buffer usart2_rb;
+static ring_buffer usart2_tx_rb;
 static usart_dev usart2 = {
     .regs     = USART2_BASE,
     .rb       = &usart2_rb,
+    .tx_rb    = &usart2_tx_rb,
     .max_baud = 2250000UL,
     .clk_id   = RCC_USART2,
     .irq_num  = NVIC_USART2,
@@ -63,9 +67,11 @@ static usart_dev usart2 = {
 usart_dev *USART2 = &usart2;
 
 static ring_buffer usart3_rb;
+static ring_buffer usart3_tx_rb;
 static usart_dev usart3 = {
     .regs     = USART3_BASE,
     .rb       = &usart3_rb,
+    .tx_rb    = &usart3_tx_rb,
     .max_baud = 2250000UL,
     .clk_id   = RCC_USART3,
     .irq_num  = NVIC_USART3,
@@ -75,9 +81,11 @@ usart_dev *USART3 = &usart3;
 
 #if defined(STM32_HIGH_DENSITY) || defined(STM32_XL_DENSITY)
 static ring_buffer uart4_rb;
+static ring_buffer uart4_tx_rb;
 static usart_dev uart4 = {
     .regs     = UART4_BASE,
     .rb       = &uart4_rb,
+    .tx_rb    = &uart4_tx_rb,
     .max_baud = 2250000UL,
     .clk_id   = RCC_UART4,
     .irq_num  = NVIC_UART4,
@@ -86,9 +94,11 @@ static usart_dev uart4 = {
 usart_dev *UART4 = &uart4;
 
 static ring_buffer uart5_rb;
+static ring_buffer uart5_tx_rb;
 static usart_dev uart5 = {
     .regs     = UART5_BASE,
     .rb       = &uart5_rb,
+    .tx_rb    = &uart5_tx_rb,
     .max_baud = 2250000UL,
     .clk_id   = RCC_UART5,
     .irq_num  = NVIC_UART5,
@@ -147,24 +157,54 @@ void usart_foreach(void (*fn)(usart_dev*)) {
  * Interrupt handlers.
  */
 
+void usart_tx_rx_irq(usart_dev *dev)
+{
+    /* RX interrupt? */
+    if (dev->regs->SR & (1 << USART_SR_RXNE_BIT))
+    {
+#ifdef USART_SAFE_INSERT
+        /* If the buffer is full and the user defines USART_SAFE_INSERT,
+         * ignore new bytes. */
+        rb_safe_insert(dev->rb, (uint8)dev->regs->DR);
+#else
+        /* By default, push bytes around in the ring buffer. */
+        rb_push_insert(dev->rb, (uint8)dev->regs->DR);
+#endif
+    }
+    
+    /* TX interrupt? */
+    if (dev->regs->SR & (1 << USART_SR_TXE_BIT))
+    {
+        if (!rb_is_empty(dev->tx_rb))
+        {
+            dev->regs->DR = rb_remove(dev->tx_rb);
+        }
+        else
+        {
+            /* Nothing left to do, disable the tx interrupt */
+            dev->regs->CR1 &= ~USART_CR1_TXEIE;
+        }
+    }
+}
+        
 void __irq_usart1(void) {
-    usart_irq(&usart1_rb, USART1_BASE);
+    usart_tx_rx_irq(USART1);
 }
 
 void __irq_usart2(void) {
-    usart_irq(&usart2_rb, USART2_BASE);
+    usart_tx_rx_irq(USART2);
 }
 
 void __irq_usart3(void) {
-    usart_irq(&usart3_rb, USART3_BASE);
+    usart_tx_rx_irq(USART3);
 }
 
 #ifdef STM32_HIGH_DENSITY
 void __irq_uart4(void) {
-    usart_irq(&uart4_rb, UART4_BASE);
+    usart_tx_rx_irq(UART4);
 }
 
 void __irq_uart5(void) {
-    usart_irq(&uart5_rb, UART5_BASE);
+    usart_tx_rx_irq(UART5);
 }
 #endif

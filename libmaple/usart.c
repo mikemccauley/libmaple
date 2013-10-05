@@ -40,6 +40,7 @@
  */
 void usart_init(usart_dev *dev) {
     rb_init(dev->rb, USART_RX_BUF_SIZE, dev->rx_buf);
+    rb_init(dev->tx_rb, USART_TX_BUF_SIZE, dev->tx_buf);
     rcc_clk_enable(dev->clk_id);
     nvic_irq_enable(dev->irq_num);
 }
@@ -57,7 +58,7 @@ void usart_init(usart_dev *dev) {
  */
 void usart_enable(usart_dev *dev) {
     usart_reg_map *regs = dev->regs;
-    regs->CR1 = (USART_CR1_TE | USART_CR1_RE | USART_CR1_RXNEIE |
+    regs->CR1 = (USART_CR1_TE | USART_CR1_RE | USART_CR1_RXNEIE | 
                  USART_CR1_M_8N1);
     regs->CR1 |= USART_CR1_UE;
 }
@@ -82,18 +83,25 @@ void usart_disable(usart_dev *dev) {
 }
 
 /**
- * @brief Nonblocking USART transmit
+ * @brief Buffered Nonblocking USART transmit
  * @param dev Serial port to transmit over
  * @param buf Buffer to transmit
  * @param len Maximum number of bytes to transmit
- * @return Number of bytes transmitted
+ * @return Number of bytes queued in buffer. If less than len, buffer is full
  */
 uint32 usart_tx(usart_dev *dev, const uint8 *buf, uint32 len) {
     usart_reg_map *regs = dev->regs;
     uint32 txed = 0;
-    while ((regs->SR & USART_SR_TXE) && (txed < len)) {
-        regs->DR = buf[txed++];
+
+    // ALERT: what if the ring buffer changes during this?
+    while (!rb_is_full(dev->tx_rb) 
+           && (txed < len)
+           && rb_safe_insert(dev->tx_rb, buf[txed]))
+    {
+        txed++;
     }
+    /* Now start the transmitter by enabling the interrupt if not already */
+    regs->CR1 |= USART_CR1_TXEIE;
     return txed;
 }
 
