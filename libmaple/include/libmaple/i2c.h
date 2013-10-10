@@ -209,6 +209,7 @@ typedef struct i2c_msg {
 #define I2C_SLAVE_USE_TX_BUFFER 0x20          // Use a buffered message when doing a slave transmit
 #define I2C_SLAVE_DUAL_ADDRESS  0x40          // Enable the dual slave address scheme
 #define I2C_SLAVE_GENERAL_CALL  0x80          // Enable the general call on address 0x00
+
 void i2c_master_enable(i2c_dev *dev, uint32 flags);
 void i2c_slave_enable(i2c_dev *dev, uint32 flags);
 
@@ -259,12 +260,16 @@ static inline void i2c_stop_condition(i2c_dev *dev) {
         ;
     }
     dev->regs->CR1 |= I2C_CR1_STOP;
+#if 0
+    /* mikem: This polling loop causes the i2c ISR to block for about 50us over the last byte of a master receive */
+    /* This can interfere with other important ISRs */
+    /* Why was it there? Seems unnecessary. Deleted by mikem */
     while ((cr1 = dev->regs->CR1) & (I2C_CR1_START |
                                      I2C_CR1_STOP  |
                                      I2C_CR1_PEC)) {
         ;
     }
-
+#endif
 }
 
 /* IRQ enable/disable */

@@ -216,7 +216,7 @@ void i2c_master_enable(i2c_dev *dev, uint32 flags) {
     /* Make it go! */
     i2c_peripheral_enable(dev);
     i2c_enable_ack(dev);
-
+    dev->is_slave = 0;
     dev->state = I2C_STATE_IDLE;
 }
 
@@ -243,6 +243,7 @@ void i2c_master_enable(i2c_dev *dev, uint32 flags) {
 void i2c_slave_enable(i2c_dev *dev, uint32 flags) {
     i2c_disable(dev);
     i2c_master_enable(dev, dev->config_flags | flags);
+    dev->is_slave = 1;
 }
 
 /**
@@ -266,7 +267,6 @@ int32 i2c_master_xfer(i2c_dev *dev,
                       uint16 num,
                       uint32 timeout) {
     int32 rc;
-
     ASSERT(dev->state == I2C_STATE_IDLE);
 
     dev->msg = msgs;
@@ -326,7 +326,7 @@ static inline int32 wait_for_state_change(i2c_dev *dev,
 
 /*
  * IRQ handler for I2C master. Handles transmission/reception.
- */
+*/
 void _i2c_irq_handler(i2c_dev *dev) {
     /* WTFs:
      * - Where is I2C_MSG_10BIT_ADDR handled?
@@ -349,11 +349,7 @@ void _i2c_irq_handler(i2c_dev *dev) {
      */
 
     /* Check to see if MSL master slave bit is set */
-    // next line is wrong: fix needed else get crashes in master
-//    if ((sr2 & I2C_SR2_MSL) != I2C_SR2_MSL) { /* 0 = slave mode 1 = master */
-// this works as a fix:
-     if (dev->state != I2C_STATE_BUSY) { /* Master Xfer and no place else sets I2C_STATE_BUSY */
-
+    if (dev->is_slave) { /* mikem new way to test for slave mode */
         /* Check for address match */
         if (sr1 & I2C_SR1_ADDR) {
             /* Find out which address was matched */
@@ -456,7 +452,7 @@ void _i2c_irq_handler(i2c_dev *dev) {
             dev->state = I2C_STATE_BUSY;
             sr1 = sr2 = 0;
         }
-        
+
         /* EV2: Slave received data from a master. Get from DR */
         if (sr1 & I2C_SR1_RXNE) {
             if (dev->config_flags & I2C_SLAVE_USE_RX_BUFFER) {
@@ -665,7 +661,7 @@ void _i2c_irq_error_handler(i2c_dev *dev) {
                                          I2C_SR1_OVR);
 
     /* Are we in slave mode? */
-    if ((dev->regs->SR2 & I2C_SR2_MSL) != I2C_SR2_MSL) {
+    if (dev->is_slave) { /* mikem new way to test for slave mode */
         /* Check to see if the master device did a NAK on the last bit
          * This is perfectly valid for a master to do this on the bus.
          * We ignore this. Any further error processing takes us into dead
@@ -762,6 +758,7 @@ void i2c_slave_attach_recv_handler(i2c_dev *dev, i2c_msg *msg, i2c_slave_recv_ca
     dev->i2c_slave_recv_callback = func;
     dev->i2c_slave_msg = msg;
     msg->xferred = 0;
+    dev->is_slave = 1;
 }
 
 
@@ -776,4 +773,5 @@ void i2c_slave_attach_transmit_handler(i2c_dev *dev, i2c_msg *msg, i2c_slave_tra
     dev->i2c_slave_transmit_callback = func;
     dev->i2c_slave_msg = msg;
     msg->xferred = 0;
+    dev->is_slave = 1;
 }

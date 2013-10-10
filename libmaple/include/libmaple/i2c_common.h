@@ -92,11 +92,11 @@ typedef struct i2c_dev {
     nvic_irq_num er_nvic_line;  /**< Error IRQ number */
     volatile i2c_state state;   /**< Device state */
     uint32 config_flags;        /**< Configuration flags */
-
     /*
      * Slave implementation. Callback functions in this struct allow
      * for a separate callback function for each I2C unit available onboard
      */
+    uint8 is_slave;             /**< True if acting as a slave. mikem */
     i2c_slave_transmit_callback_func i2c_slave_transmit_callback;
     i2c_slave_recv_callback_func i2c_slave_recv_callback;
 
