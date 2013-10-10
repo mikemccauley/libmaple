@@ -39,6 +39,8 @@
  * @param dev         Serial port to be initialized
  */
 void usart_init(usart_dev *dev) {
+    /* Prevent the ring buffers changing under us by disabling interrupts while we do this */
+    nvic_irq_disable(dev->irq_num);
     rb_init(dev->rb, USART_RX_BUF_SIZE, dev->rx_buf);
     rb_init(dev->tx_rb, USART_TX_BUF_SIZE, dev->tx_buf);
     rcc_clk_enable(dev->clk_id);
@@ -78,8 +80,9 @@ void usart_disable(usart_dev *dev) {
     /* Disable UE */
     regs->CR1 &= ~USART_CR1_UE;
 
-    /* Clean up buffer */
+    /* Clean up buffers */
     usart_reset_rx(dev);
+    usart_reset_tx(dev);
 }
 
 /**
@@ -93,15 +96,17 @@ uint32 usart_tx(usart_dev *dev, const uint8 *buf, uint32 len) {
     usart_reg_map *regs = dev->regs;
     uint32 txed = 0;
 
-    // ALERT: what if the ring buffer changes during this?
-    while (!rb_is_full(dev->tx_rb) 
-           && (txed < len)
+    /* Prevent the ring buffer changing under us by disabling interrupts */
+    nvic_irq_disable(dev->irq_num);
+    while (   (txed < len)
            && rb_safe_insert(dev->tx_rb, buf[txed]))
     {
         txed++;
     }
-    /* Now start the transmitter by enabling the interrupt if not already */
+    nvic_irq_enable(dev->irq_num);
+    /* Now start the transmitter by enabling the TX Empty interrupt if not already */
     regs->CR1 |= USART_CR1_TXEIE;
+
     return txed;
 }
 
@@ -115,7 +120,9 @@ uint32 usart_tx(usart_dev *dev, const uint8 *buf, uint32 len) {
 uint32 usart_rx(usart_dev *dev, uint8 *buf, uint32 len) {
     uint32 rxed = 0;
     while (usart_data_available(dev) && rxed < len) {
+        nvic_irq_disable(dev->irq_num);
         *buf++ = usart_getc(dev);
+        nvic_irq_enable(dev->irq_num);
         rxed++;
     }
     return rxed;

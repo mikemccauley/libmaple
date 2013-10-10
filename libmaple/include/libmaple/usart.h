@@ -441,7 +441,7 @@ static inline void usart_disable_all(void) {
  * @brief Transmit one character on a serial port.
  *
  * This function blocks until the character has been successfully
- * transmitted.
+ * queued in the tx buffer.
  *
  * @param dev Serial port to send on.
  * @param byte Byte to transmit.
@@ -454,7 +454,7 @@ static inline void usart_putc(usart_dev* dev, uint8 byte) {
 /**
  * @brief Transmit a character string on a serial port.
  *
- * This function blocks until str is completely transmitted.
+ * This function blocks until str is completely queued in the tx buffer.
  *
  * @param dev Serial port to send on
  * @param str String to send
@@ -495,6 +495,14 @@ static inline uint32 usart_data_available(usart_dev *dev) {
  */
 static inline void usart_reset_rx(usart_dev *dev) {
     rb_reset(dev->rb);
+}
+
+/**
+ * @brief Discard the contents of a serial port's TX buffer.
+ * @param dev Serial port whose buffer to empty.
+ */
+static inline void usart_reset_tx(usart_dev *dev) {
+    rb_reset(dev->tx_rb);
 }
 
 #ifdef __cplusplus

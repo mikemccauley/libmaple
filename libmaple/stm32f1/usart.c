@@ -154,14 +154,16 @@ void usart_foreach(void (*fn)(usart_dev*)) {
 }
 
 /*
- * Interrupt handlers.
+ * Interrupt handler for TX and RX
  */
-
 void usart_tx_rx_irq(usart_dev *dev)
 {
+    uint32 sr = dev->regs->SR; /* Status Register */
+
     /* RX interrupt? */
-    if (dev->regs->SR & (1 << USART_SR_RXNE_BIT))
+    if (sr & USART_SR_RXNE)
     {
+        /* If there is an overrun error, the subsequent read will clear it too */
 #ifdef USART_SAFE_INSERT
         /* If the buffer is full and the user defines USART_SAFE_INSERT,
          * ignore new bytes. */
@@ -173,7 +175,7 @@ void usart_tx_rx_irq(usart_dev *dev)
     }
     
     /* TX interrupt? */
-    if (dev->regs->SR & (1 << USART_SR_TXE_BIT))
+    if (sr & USART_SR_TXE)
     {
         if (!rb_is_empty(dev->tx_rb))
         {
